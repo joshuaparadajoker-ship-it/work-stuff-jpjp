@@ -1,0 +1,1008 @@
+{
+  "name": "Omnichannel Lead Engine",
+  "flow": [
+    {
+      "id": 1,
+      "module": "webhook:CustomWebHook",
+      "version": 1,
+      "parameters": {
+        "hook": 1,
+        "maxResults": 1
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": { "hook": { "label": "Lead Intake Webhook" } }
+      }
+    },
+    {
+      "id": 2,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": { "type": "{{1.body}}" },
+      "mapper": { "json": "{{1.body}}" },
+      "metadata": {
+        "designer": { "x": 300, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "util:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "variables": [
+          { "name": "email", "value": "{{toLower(2.email)}}" },
+          { "name": "firstName", "value": "{{2.first_name}}" },
+          { "name": "lastName", "value": "{{2.last_name}}" },
+          { "name": "company", "value": "{{2.company}}" },
+          { "name": "phone", "value": "{{2.phone}}" },
+          { "name": "utmSource", "value": "{{toLower(ifempty(2.utm_source, \"(none)\"))}}" },
+          { "name": "utmMedium", "value": "{{toLower(ifempty(2.utm_medium, \"(none)\"))}}" },
+          { "name": "utmCampaign", "value": "{{toLower(ifempty(2.utm_campaign, \"(none)\"))}}" },
+          { "name": "demoRequested", "value": "{{toBool(ifempty(2.demo_requested, false))}}" },
+          { "name": "jobTitle", "value": "{{2.job_title}}" },
+          { "name": "country", "value": "{{2.country}}" },
+          { "name": "timestamp", "value": "{{now}}" }
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 600, "y": 0 }
+      }
+    },
+    {
+      "id": 4,
+      "module": "hubspot-crm-legacy:SearchContacts",
+      "version": 1,
+      "parameters": { "portalId": "" },
+      "mapper": {
+        "filterGroups": [
+          {
+            "filters": [
+              {
+                "propertyName": "email",
+                "operator": "EQ",
+                "value": "{{3.email}}"
+              }
+            ]
+          }
+        ],
+        "properties": ["email", "firstname", "lastname", "company", "hs_lead_status", "lifecyclestage"],
+        "limit": 1
+      },
+      "metadata": {
+        "designer": { "x": 900, "y": 0 }
+      }
+    },
+    {
+      "id": 5,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": { "handleErrors": true },
+      "mapper": {
+        "url": "https://company.clearbit.com/v2/combined/find",
+        "method": "GET",
+        "headers": [
+          { "name": "Authorization", "value": "Bearer {{your_clearbit_api_key}}" }
+        ],
+        "qs": [
+          { "name": "email", "value": "{{3.email}}" }
+        ],
+        "bodyType": "raw",
+        "parseResponse": true
+      },
+      "metadata": {
+        "designer": { "x": 1200, "y": 0 }
+      }
+    },
+    {
+      "id": 6,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": { "handleErrors": true },
+      "mapper": {
+        "url": "https://api.neverbounce.com/v4/single/check",
+        "method": "GET",
+        "headers": [],
+        "qs": [
+          { "name": "key", "value": "{{your_neverbounce_api_key}}" },
+          { "name": "email", "value": "{{3.email}}" }
+        ],
+        "bodyType": "raw",
+        "parseResponse": true
+      },
+      "metadata": {
+        "designer": { "x": 1500, "y": 0 }
+      }
+    },
+    {
+      "id": 7,
+      "module": "openai-gpt-4:CreateChatCompletion",
+      "version": 1,
+      "parameters": { "model": "gpt-4o" },
+      "mapper": {
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a B2B lead scoring engine. Score leads 0-100 based on fit and intent. Return ONLY a JSON object with keys: score (integer), tier (\"hot\"|\"warm\"|\"cold\"), reasoning (string, max 100 chars)."
+          },
+          {
+            "role": "user",
+            "content": "Score this lead:\nEmail: {{3.email}}\nName: {{3.firstName}} {{3.lastName}}\nTitle: {{3.jobTitle}}\nCompany: {{3.company}}\nCountry: {{3.country}}\nUTM Source: {{3.utmSource}}\nUTM Medium: {{3.utmMedium}}\nUTM Campaign: {{3.utmCampaign}}\nDemo Requested: {{3.demoRequested}}\nEmail Valid: {{6.data.result}}\nClearbit Employee Count: {{5.data.company.metrics.employees}}\nClearbit Industry: {{5.data.company.category.industry}}"
+          }
+        ],
+        "temperature": 0.2,
+        "max_tokens": 200
+      },
+      "metadata": {
+        "designer": { "x": 1800, "y": 0 }
+      }
+    },
+    {
+      "id": 8,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "json": "{{7.choices[].message.content}}"
+      },
+      "metadata": {
+        "designer": { "x": 2100, "y": 0 }
+      }
+    },
+    {
+      "id": 9,
+      "module": "google-sheets:addRow",
+      "version": 2,
+      "parameters": {
+        "spreadsheetId": "{{your_master_log_spreadsheet_id}}",
+        "sheetId": "Master Log",
+        "includesHeaders": true
+      },
+      "mapper": {
+        "values": {
+          "Timestamp": "{{3.timestamp}}",
+          "Email": "{{3.email}}",
+          "First Name": "{{3.firstName}}",
+          "Last Name": "{{3.lastName}}",
+          "Company": "{{3.company}}",
+          "Job Title": "{{3.jobTitle}}",
+          "Country": "{{3.country}}",
+          "UTM Source": "{{3.utmSource}}",
+          "UTM Medium": "{{3.utmMedium}}",
+          "UTM Campaign": "{{3.utmCampaign}}",
+          "Demo Requested": "{{3.demoRequested}}",
+          "Lead Score": "{{8.score}}",
+          "Score Tier": "{{8.tier}}",
+          "Score Reasoning": "{{8.reasoning}}",
+          "Email Validity": "{{6.data.result}}",
+          "Clearbit Industry": "{{5.data.company.category.industry}}",
+          "Clearbit Employees": "{{5.data.company.metrics.employees}}",
+          "Existing Contact": "{{if(4.total; \"Yes\"; \"No\")}}"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 2400, "y": 0 }
+      }
+    },
+    {
+      "id": 10,
+      "module": "hubspot-crm-legacy:UpsertContact",
+      "version": 1,
+      "parameters": { "portalId": "" },
+      "mapper": {
+        "email": "{{3.email}}",
+        "properties": [
+          { "name": "firstname", "value": "{{3.firstName}}" },
+          { "name": "lastname", "value": "{{3.lastName}}" },
+          { "name": "company", "value": "{{3.company}}" },
+          { "name": "phone", "value": "{{3.phone}}" },
+          { "name": "jobtitle", "value": "{{3.jobTitle}}" },
+          { "name": "country", "value": "{{3.country}}" },
+          { "name": "hs_lead_status", "value": "{{8.tier}}" },
+          { "name": "lead_score", "value": "{{8.score}}" },
+          { "name": "utm_source", "value": "{{3.utmSource}}" },
+          { "name": "utm_medium", "value": "{{3.utmMedium}}" },
+          { "name": "utm_campaign", "value": "{{3.utmCampaign}}" }
+        ]
+      },
+      "metadata": {
+        "designer": { "x": 2700, "y": 0 }
+      }
+    },
+    {
+      "id": 11,
+      "module": "flow:Router",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": { "x": 3000, "y": 0 }
+      },
+      "routes": [
+        {
+          "flow": [
+            {
+              "id": 12,
+              "module": "flow:Filter",
+              "version": 1,
+              "parameters": {},
+              "filter": {
+                "name": "Paid / Social Traffic",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{3.utmSource}}",
+                      "b": "paid|cpc|ppc|cpm|fb|facebook|ig|instagram|tiktok|twitter|linkedin|youtube|display|adwords|google_ads",
+                      "o": "text:match"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3300, "y": 0 }
+              }
+            },
+            {
+              "id": 13,
+              "module": "flow:Router",
+              "version": 1,
+              "parameters": {},
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3600, "y": 0 }
+              },
+              "routes": [
+                {
+                  "flow": [
+                    {
+                      "id": 14,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "Hot Lead (score >= 70)",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{8.score}}",
+                              "b": "70",
+                              "o": "number:greaterThanOrEqual"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 3900, "y": 0 }
+                      }
+                    },
+                    {
+                      "id": 15,
+                      "module": "slack:PostMessage",
+                      "version": 4,
+                      "parameters": { "channel": "#sales-hot-leads" },
+                      "mapper": {
+                        "text": ":fire: *HOT LEAD* — Score {{8.score}}/100\n*{{3.firstName}} {{3.lastName}}* | {{3.jobTitle}} @ {{3.company}}\nEmail: {{3.email}} | Country: {{3.country}}\nSource: {{3.utmSource}} / {{3.utmMedium}} / {{3.utmCampaign}}\nReason: {{8.reasoning}}",
+                        "blocks": []
+                      },
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 0 }
+                      }
+                    },
+                    {
+                      "id": 16,
+                      "module": "twilio:SendSMS",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "from": "{{your_twilio_number}}",
+                        "to": "{{your_sales_rep_mobile}}",
+                        "body": "HOT LEAD: {{3.firstName}} {{3.lastName}} ({{3.company}}) score {{8.score}}. Email: {{3.email}}. Source: {{3.utmSource}}. Call now!"
+                      },
+                      "metadata": {
+                        "designer": { "x": 4500, "y": 0 }
+                      }
+                    },
+                    {
+                      "id": 17,
+                      "module": "notion:CreatePage",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "databaseId": "{{your_notion_deals_db_id}}",
+                        "title": "{{3.firstName}} {{3.lastName}} — {{3.company}}",
+                        "properties": {
+                          "Email": { "email": "{{3.email}}" },
+                          "Score": { "number": "{{8.score}}" },
+                          "Tier": { "select": { "name": "Hot" } },
+                          "Source": { "rich_text": [{ "text": { "content": "{{3.utmSource}}" } }] },
+                          "Status": { "select": { "name": "New" } },
+                          "Created": { "date": { "start": "{{3.timestamp}}" } }
+                        }
+                      },
+                      "metadata": {
+                        "designer": { "x": 4800, "y": 0 }
+                      }
+                    },
+                    {
+                      "id": 18,
+                      "module": "google-calendar:createEvent",
+                      "version": 3,
+                      "parameters": {},
+                      "mapper": {
+                        "calendarId": "primary",
+                        "summary": "VIP Discovery Call — {{3.firstName}} {{3.lastName}} ({{3.company}})",
+                        "description": "Lead Score: {{8.score}}\nSource: {{3.utmSource}}\nReasoning: {{8.reasoning}}",
+                        "start": "{{addDays(now; 1)}}",
+                        "end": "{{addMinutes(addDays(now; 1); 30)}}",
+                        "attendees": [{ "email": "{{3.email}}" }]
+                      },
+                      "metadata": {
+                        "designer": { "x": 5100, "y": 0 }
+                      }
+                    },
+                    {
+                      "id": 19,
+                      "module": "gmail:sendEmail",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "to": "{{3.email}}",
+                        "subject": "Let's talk, {{3.firstName}} — you're exactly who we built this for",
+                        "bodyType": "html",
+                        "body": "<p>Hi {{3.firstName}},</p><p>I noticed you came from {{3.utmCampaign}} and wanted to reach out personally. Based on what I know about {{3.company}}, I think we can genuinely move the needle for your team.</p><p>I've blocked 30 minutes for a call — does tomorrow work?</p><p>Best,<br>The Team</p>"
+                      },
+                      "metadata": {
+                        "designer": { "x": 5400, "y": 0 }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 20,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "Warm Lead (score 40–69)",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{8.score}}",
+                              "b": "40",
+                              "o": "number:greaterThanOrEqual"
+                            },
+                            {
+                              "a": "{{8.score}}",
+                              "b": "70",
+                              "o": "number:lessThan"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 3900, "y": 700 }
+                      }
+                    },
+                    {
+                      "id": 21,
+                      "module": "mailchimp:addUpdateSubscriber",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "listId": "{{your_mailchimp_warm_list_id}}",
+                        "email": "{{3.email}}",
+                        "status": "subscribed",
+                        "merge_fields": {
+                          "FNAME": "{{3.firstName}}",
+                          "LNAME": "{{3.lastName}}",
+                          "COMPANY": "{{3.company}}",
+                          "SCORE": "{{8.score}}"
+                        },
+                        "tags": ["warm-lead", "{{3.utmSource}}"]
+                      },
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 700 }
+                      }
+                    },
+                    {
+                      "id": 22,
+                      "module": "util:Sleep",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": { "delay": 900 },
+                      "metadata": {
+                        "designer": { "x": 4500, "y": 700 }
+                      }
+                    },
+                    {
+                      "id": 23,
+                      "module": "openai-gpt-4:CreateChatCompletion",
+                      "version": 1,
+                      "parameters": { "model": "gpt-4o" },
+                      "mapper": {
+                        "messages": [
+                          {
+                            "role": "system",
+                            "content": "Write a short, personalized follow-up email (3 short paragraphs, no fluff) for a warm B2B lead. Return plain HTML body only."
+                          },
+                          {
+                            "role": "user",
+                            "content": "Lead: {{3.firstName}} {{3.lastName}}, {{3.jobTitle}} at {{3.company}}. Source: {{3.utmSource}} / {{3.utmCampaign}}. Industry: {{5.data.company.category.industry}}. Score reasoning: {{8.reasoning}}."
+                          }
+                        ],
+                        "temperature": 0.7,
+                        "max_tokens": 400
+                      },
+                      "metadata": {
+                        "designer": { "x": 4800, "y": 700 }
+                      }
+                    },
+                    {
+                      "id": 24,
+                      "module": "gmail:sendEmail",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "to": "{{3.email}}",
+                        "subject": "Quick thought for {{3.company}}, {{3.firstName}}",
+                        "bodyType": "html",
+                        "body": "{{23.choices[].message.content}}"
+                      },
+                      "metadata": {
+                        "designer": { "x": 5100, "y": 700 }
+                      }
+                    },
+                    {
+                      "id": 25,
+                      "module": "google-sheets:addRow",
+                      "version": 2,
+                      "parameters": {
+                        "spreadsheetId": "{{your_master_log_spreadsheet_id}}",
+                        "sheetId": "Warm Tracker",
+                        "includesHeaders": true
+                      },
+                      "mapper": {
+                        "values": {
+                          "Timestamp": "{{3.timestamp}}",
+                          "Email": "{{3.email}}",
+                          "Name": "{{3.firstName}} {{3.lastName}}",
+                          "Company": "{{3.company}}",
+                          "Score": "{{8.score}}",
+                          "Source": "{{3.utmSource}}",
+                          "Email Sent": "Yes"
+                        }
+                      },
+                      "metadata": {
+                        "designer": { "x": 5400, "y": 700 }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 26,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "Cold Lead (score < 40)",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{8.score}}",
+                              "b": "40",
+                              "o": "number:lessThan"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 3900, "y": 1400 }
+                      }
+                    },
+                    {
+                      "id": 27,
+                      "module": "mailchimp:addUpdateSubscriber",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "listId": "{{your_mailchimp_drip_list_id}}",
+                        "email": "{{3.email}}",
+                        "status": "subscribed",
+                        "merge_fields": {
+                          "FNAME": "{{3.firstName}}",
+                          "LNAME": "{{3.lastName}}",
+                          "COMPANY": "{{3.company}}"
+                        },
+                        "tags": ["cold-drip", "{{3.utmSource}}"]
+                      },
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 1400 }
+                      }
+                    },
+                    {
+                      "id": 28,
+                      "module": "notion:CreatePage",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "databaseId": "{{your_notion_archive_db_id}}",
+                        "title": "{{3.firstName}} {{3.lastName}} — {{3.company}}",
+                        "properties": {
+                          "Email": { "email": "{{3.email}}" },
+                          "Score": { "number": "{{8.score}}" },
+                          "Tier": { "select": { "name": "Cold" } },
+                          "Source": { "rich_text": [{ "text": { "content": "{{3.utmSource}}" } }] },
+                          "Status": { "select": { "name": "Archived" } }
+                        }
+                      },
+                      "metadata": {
+                        "designer": { "x": 4500, "y": 1400 }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 29,
+              "module": "flow:Filter",
+              "version": 1,
+              "parameters": {},
+              "filter": {
+                "name": "Organic / SEO Traffic",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{3.utmSource}}",
+                      "b": "organic|seo|blog|content|search|google|bing|newsletter",
+                      "o": "text:match"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3300, "y": 1400 }
+              }
+            },
+            {
+              "id": 30,
+              "module": "flow:Router",
+              "version": 1,
+              "parameters": {},
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3600, "y": 1400 }
+              },
+              "routes": [
+                {
+                  "flow": [
+                    {
+                      "id": 31,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "Demo Requested",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{3.demoRequested}}",
+                              "b": "true",
+                              "o": "boolean:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 3900, "y": 1400 }
+                      }
+                    },
+                    {
+                      "id": 32,
+                      "module": "google-calendar:createEvent",
+                      "version": 3,
+                      "parameters": {},
+                      "mapper": {
+                        "calendarId": "primary",
+                        "summary": "Demo — {{3.firstName}} {{3.lastName}} ({{3.company}})",
+                        "description": "Organic lead requested demo.\nScore: {{8.score}}\nSource: {{3.utmSource}} / {{3.utmCampaign}}",
+                        "start": "{{addDays(now; 2)}}",
+                        "end": "{{addMinutes(addDays(now; 2); 60)}}",
+                        "attendees": [{ "email": "{{3.email}}" }]
+                      },
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 1400 }
+                      }
+                    },
+                    {
+                      "id": 33,
+                      "module": "airtable:createRecord",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "baseId": "{{your_airtable_base_id}}",
+                        "tableId": "Demo Pipeline",
+                        "fields": {
+                          "Name": "{{3.firstName}} {{3.lastName}}",
+                          "Email": "{{3.email}}",
+                          "Company": "{{3.company}}",
+                          "Job Title": "{{3.jobTitle}}",
+                          "Score": "{{8.score}}",
+                          "Source": "{{3.utmSource}}",
+                          "Status": "Demo Scheduled",
+                          "Created": "{{3.timestamp}}"
+                        }
+                      },
+                      "metadata": {
+                        "designer": { "x": 4500, "y": 1400 }
+                      }
+                    },
+                    {
+                      "id": 34,
+                      "module": "gmail:sendEmail",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "to": "{{3.email}}",
+                        "subject": "Your demo is confirmed, {{3.firstName}}!",
+                        "bodyType": "html",
+                        "body": "<p>Hi {{3.firstName}},</p><p>Great news — your demo has been scheduled! You'll receive a calendar invite shortly.</p><p>In the meantime, feel free to check out our <a href='{{your_docs_url}}'>documentation</a> or reply to this email with any questions.</p><p>Looking forward to showing you what we've built,<br>The Team</p>"
+                      },
+                      "metadata": {
+                        "designer": { "x": 4800, "y": 1400 }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 35,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "No Demo — Content Subscriber",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{3.demoRequested}}",
+                              "b": "false",
+                              "o": "boolean:equal"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 3900, "y": 2100 }
+                      }
+                    },
+                    {
+                      "id": 36,
+                      "module": "mailchimp:addUpdateSubscriber",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "listId": "{{your_mailchimp_content_list_id}}",
+                        "email": "{{3.email}}",
+                        "status": "subscribed",
+                        "merge_fields": {
+                          "FNAME": "{{3.firstName}}",
+                          "LNAME": "{{3.lastName}}",
+                          "COMPANY": "{{3.company}}"
+                        },
+                        "tags": ["content-subscriber", "organic", "{{3.utmCampaign}}"]
+                      },
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 2100 }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 37,
+              "module": "flow:Filter",
+              "version": 1,
+              "parameters": {},
+              "filter": {
+                "name": "Referral / Partner Traffic",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{3.utmSource}}",
+                      "b": "referral|partner|affiliate|reseller|channel",
+                      "o": "text:match"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3300, "y": 2800 }
+              }
+            },
+            {
+              "id": 38,
+              "module": "http:ActionSendData",
+              "version": 3,
+              "parameters": { "handleErrors": true },
+              "mapper": {
+                "url": "https://api.partnerstack.com/api/v2/partnerships",
+                "method": "GET",
+                "headers": [
+                  { "name": "x-api-key", "value": "{{your_partnerstack_api_key}}" }
+                ],
+                "qs": [
+                  { "name": "email", "value": "{{3.email}}" },
+                  { "name": "campaign", "value": "{{3.utmCampaign}}" }
+                ],
+                "parseResponse": true
+              },
+              "metadata": {
+                "designer": { "x": 3600, "y": 2800 }
+              }
+            },
+            {
+              "id": 39,
+              "module": "flow:Router",
+              "version": 1,
+              "parameters": {},
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3900, "y": 2800 }
+              },
+              "routes": [
+                {
+                  "flow": [
+                    {
+                      "id": 40,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "Strategic Partner",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{38.data.tier}}",
+                              "b": "strategic|platinum|gold|enterprise",
+                              "o": "text:match"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 2800 }
+                      }
+                    },
+                    {
+                      "id": 41,
+                      "module": "slack:PostMessage",
+                      "version": 4,
+                      "parameters": { "channel": "#partnerships-vip" },
+                      "mapper": {
+                        "text": ":star2: *Strategic Partner Referral*\n*{{3.firstName}} {{3.lastName}}* | {{3.jobTitle}} @ {{3.company}}\nEmail: {{3.email}} | Score: {{8.score}}\nPartner Campaign: {{3.utmCampaign}}\nPartnerStack Tier: {{38.data.tier}}"
+                      },
+                      "metadata": {
+                        "designer": { "x": 4500, "y": 2800 }
+                      }
+                    },
+                    {
+                      "id": 42,
+                      "module": "google-calendar:createEvent",
+                      "version": 3,
+                      "parameters": {},
+                      "mapper": {
+                        "calendarId": "primary",
+                        "summary": "Joint Partner Call — {{3.firstName}} {{3.lastName}} / {{38.data.partnerName}}",
+                        "description": "Strategic partner referral.\nLead: {{3.email}}\nPartner: {{38.data.partnerName}}\nTier: {{38.data.tier}}",
+                        "start": "{{addDays(now; 1)}}",
+                        "end": "{{addMinutes(addDays(now; 1); 45)}}",
+                        "attendees": [
+                          { "email": "{{3.email}}" },
+                          { "email": "{{38.data.partnerEmail}}" }
+                        ]
+                      },
+                      "metadata": {
+                        "designer": { "x": 4800, "y": 2800 }
+                      }
+                    },
+                    {
+                      "id": 43,
+                      "module": "gmail:sendEmail",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "to": "{{3.email}}",
+                        "subject": "White-glove onboarding for {{3.company}} — referred by {{38.data.partnerName}}",
+                        "bodyType": "html",
+                        "body": "<p>Hi {{3.firstName}},</p><p>Our partners at {{38.data.partnerName}} told us about you — and we wanted to make sure you get the full white-glove experience from day one.</p><p>I've scheduled a joint call with both teams so we can hit the ground running. Expect a calendar invite shortly.</p><p>Warmly,<br>The Team</p>"
+                      },
+                      "metadata": {
+                        "designer": { "x": 5100, "y": 2800 }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "flow": [
+                    {
+                      "id": 44,
+                      "module": "flow:Filter",
+                      "version": 1,
+                      "parameters": {},
+                      "filter": {
+                        "name": "Standard Partner",
+                        "conditions": [
+                          [
+                            {
+                              "a": "{{38.data.tier}}",
+                              "b": "standard|silver|bronze|basic",
+                              "o": "text:match"
+                            }
+                          ]
+                        ]
+                      },
+                      "mapper": {},
+                      "metadata": {
+                        "designer": { "x": 4200, "y": 3500 }
+                      }
+                    },
+                    {
+                      "id": 45,
+                      "module": "slack:PostMessage",
+                      "version": 4,
+                      "parameters": { "channel": "#partnerships" },
+                      "mapper": {
+                        "text": ":handshake: *Partner Referral*\n{{3.firstName}} {{3.lastName}} ({{3.company}}) referred by {{38.data.partnerName}}\nEmail: {{3.email}} | Score: {{8.score}} | Tier: {{38.data.tier}}"
+                      },
+                      "metadata": {
+                        "designer": { "x": 4500, "y": 3500 }
+                      }
+                    },
+                    {
+                      "id": 46,
+                      "module": "gmail:sendEmail",
+                      "version": 1,
+                      "parameters": {},
+                      "mapper": {
+                        "to": "{{3.email}}",
+                        "subject": "Thanks for your interest, {{3.firstName}} — here's what's next",
+                        "bodyType": "html",
+                        "body": "<p>Hi {{3.firstName}},</p><p>Thanks for coming through {{38.data.partnerName}} — we really appreciate the referral.</p><p>We'd love to learn more about what you're trying to accomplish at {{3.company}}. Reply to this email or grab time on my calendar below.</p><p>Best,<br>The Team</p>"
+                      },
+                      "metadata": {
+                        "designer": { "x": 4800, "y": 3500 }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "flow": [
+            {
+              "id": 47,
+              "module": "flow:Filter",
+              "version": 1,
+              "parameters": {},
+              "filter": {
+                "name": "Unclassified / Direct / (none)",
+                "conditions": [
+                  [
+                    {
+                      "a": "{{3.utmSource}}",
+                      "b": "unclassified|direct|\\(none\\)|^$",
+                      "o": "text:match"
+                    }
+                  ]
+                ]
+              },
+              "mapper": {},
+              "metadata": {
+                "designer": { "x": 3300, "y": 4200 }
+              }
+            },
+            {
+              "id": 48,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "parameters": {
+                "spreadsheetId": "{{your_master_log_spreadsheet_id}}",
+                "sheetId": "Triage",
+                "includesHeaders": true
+              },
+              "mapper": {
+                "values": {
+                  "Timestamp": "{{3.timestamp}}",
+                  "Email": "{{3.email}}",
+                  "Name": "{{3.firstName}} {{3.lastName}}",
+                  "Company": "{{3.company}}",
+                  "Score": "{{8.score}}",
+                  "UTM Source": "{{3.utmSource}}",
+                  "UTM Medium": "{{3.utmMedium}}",
+                  "UTM Campaign": "{{3.utmCampaign}}",
+                  "Needs Triage": "Yes"
+                }
+              },
+              "metadata": {
+                "designer": { "x": 3600, "y": 4200 }
+              }
+            },
+            {
+              "id": 49,
+              "module": "slack:PostMessage",
+              "version": 4,
+              "parameters": { "channel": "#ops-triage" },
+              "mapper": {
+                "text": ":mag: *Unclassified Lead — Needs Triage*\n*{{3.firstName}} {{3.lastName}}* | {{3.jobTitle}} @ {{3.company}}\nEmail: {{3.email}} | Score: {{8.score}}\nUTM Source: `{{3.utmSource}}` | Medium: `{{3.utmMedium}}` | Campaign: `{{3.utmCampaign}}`\nPlease review and route manually."
+              },
+              "metadata": {
+                "designer": { "x": 3900, "y": 4200 }
+              }
+            },
+            {
+              "id": 50,
+              "module": "gmail:sendEmail",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "to": "ops@{{your_company_domain}}",
+                "subject": "[Ops Triage] Unclassified lead — {{3.firstName}} {{3.lastName}} ({{3.company}})",
+                "bodyType": "html",
+                "body": "<p>An unclassified lead needs manual routing:</p><table border='1' cellpadding='6' cellspacing='0'><tr><th>Field</th><th>Value</th></tr><tr><td>Name</td><td>{{3.firstName}} {{3.lastName}}</td></tr><tr><td>Email</td><td>{{3.email}}</td></tr><tr><td>Company</td><td>{{3.company}}</td></tr><tr><td>Title</td><td>{{3.jobTitle}}</td></tr><tr><td>Score</td><td>{{8.score}}</td></tr><tr><td>Tier</td><td>{{8.tier}}</td></tr><tr><td>Reasoning</td><td>{{8.reasoning}}</td></tr><tr><td>UTM Source</td><td>{{3.utmSource}}</td></tr><tr><td>UTM Medium</td><td>{{3.utmMedium}}</td></tr><tr><td>UTM Campaign</td><td>{{3.utmCampaign}}</td></tr><tr><td>Timestamp</td><td>{{3.timestamp}}</td></tr></table>"
+              },
+              "metadata": {
+                "designer": { "x": 4200, "y": 4200 }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    },
+    "zone": "us1.make.com"
+  }
+}
