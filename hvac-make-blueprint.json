@@ -1,0 +1,708 @@
+{
+  "name": "HVAC AI Inbound Call Handler — Alex Voice Agent",
+  "flow": [
+    {
+      "id": 1,
+      "module": "twilio:NewCall",
+      "version": 1,
+      "parameters": {
+        "accountSid": "{{connection.accountSid}}",
+        "webhookType": "inbound"
+      },
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0,
+          "name": "Twilio — Inbound Call Trigger"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "json": "{{1.body}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 320,
+          "y": 0,
+          "name": "Parse Twilio Webhook Payload"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "builtin:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "variables": [
+          {
+            "name": "caller_phone",
+            "value": "{{2.From}}"
+          },
+          {
+            "name": "call_sid",
+            "value": "{{2.CallSid}}"
+          },
+          {
+            "name": "call_status",
+            "value": "{{2.CallStatus}}"
+          },
+          {
+            "name": "caller_name",
+            "value": "{{ifempty(2.CallerName; \"Unknown Caller\")}}"
+          },
+          {
+            "name": "call_timestamp",
+            "value": "{{formatDate(now; \"YYYY-MM-DD HH:mm:ss\"; \"America/Chicago\")}}"
+          },
+          {
+            "name": "to_number",
+            "value": "{{2.To}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 640,
+          "y": 0,
+          "name": "Set Core Call Variables"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDecompression": true
+      },
+      "mapper": {
+        "url": "https://api.vapi.ai/call/phone",
+        "method": "POST",
+        "headers": [
+          {
+            "name": "Authorization",
+            "value": "Bearer {{connection.vapiApiKey}}"
+          },
+          {
+            "name": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "bodyType": "raw",
+        "contentType": "application/json",
+        "body": "{\"phoneNumberId\":\"{{connection.vapiPhoneNumberId}}\",\"customer\":{\"number\":\"{{3.caller_phone}}\",\"name\":\"{{3.caller_name}}\"},\"assistant\":{\"name\":\"Alex\",\"firstMessage\":\"Thank you for calling! My name is Alex, and I'm the virtual receptionist for our HVAC team. I'm here to help get your issue resolved quickly. Can you start by telling me what's going on with your system today?\",\"transcriber\":{\"provider\":\"deepgram\",\"model\":\"nova-2\",\"language\":\"en-US\"},\"model\":{\"provider\":\"openai\",\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"system\",\"content\":\"You are Alex, a professional, warm, and efficient virtual receptionist for a local HVAC contractor. Your sole job is to qualify inbound service leads and collect appointment information. Follow this exact script flow:\\n\\nSTEP 1 — GREETING: Greet the caller by name if available. Thank them for calling.\\n\\nSTEP 2 — IDENTIFY THE ISSUE: Ask what HVAC problem they are experiencing. Categorize into one of: AC not cooling, heater broken, new install, routine maintenance, or emergency. If they describe an emergency (no heat in winter, no AC in extreme heat, carbon monoxide, gas smell), immediately reassure them: 'I understand, we treat all emergency calls as top priority and will get someone to you as fast as possible.'\\n\\nSTEP 3 — SERVICE ADDRESS: Ask for the full service address including street number, street name, city, and zip code. Repeat it back to confirm accuracy.\\n\\nSTEP 4 — HOMEOWNER CONFIRMATION: Ask: 'Are you the homeowner or the person authorized to approve repair work and payment?' If no, ask to speak with that person or collect their contact information.\\n\\nSTEP 5 — AVAILABILITY: Ask for their preferred date and time for a technician visit. Offer morning (8am-12pm) or afternoon (12pm-5pm) windows if they are unsure.\\n\\nSTEP 6 — URGENCY: Ask how urgent this is: emergency (needs help today/immediately), urgent (within 24 hours), or standard (within the next few days).\\n\\nSTEP 7 — CLOSE: Once all info is gathered say: 'Perfect, I have everything I need. A technician will be confirmed shortly and our owner will reach out to you to finalize the appointment details. You may also receive a text confirmation. Is there anything else I can help you with today?'\\n\\nIMPORTANT RULES: Never quote prices. Never make promises about specific arrival times. Always be empathetic. Keep responses concise — this is a phone call, not a chat. If the caller wants to be transferred to a human, say: 'I completely understand. Let me connect you with our team right away.' then end the call politely.\"}],\"maxTokens\":500,\"temperature\":0.6},\"voice\":{\"provider\":\"11labs\",\"voiceId\":\"rachel\",\"stability\":0.5,\"similarityBoost\":0.75},\"endCallPhrases\":[\"goodbye\",\"have a great day\",\"take care\"],\"analysisPlan\":{\"summaryPrompt\":\"Summarize this HVAC service call. Extract and return the following fields in JSON: caller_name, issue_type (one of: ac_not_cooling, heater_broken, new_install, maintenance, emergency), address (full street address), preferred_time (date and time window), urgency_level (one of: emergency, urgent, standard), is_homeowner (true/false), call_qualified (true if address AND issue_type were captured).\",\"structuredDataSchema\":{\"type\":\"object\",\"properties\":{\"caller_name\":{\"type\":\"string\"},\"issue_type\":{\"type\":\"string\"},\"address\":{\"type\":\"string\"},\"preferred_time\":{\"type\":\"string\"},\"urgency_level\":{\"type\":\"string\"},\"is_homeowner\":{\"type\":\"boolean\"},\"call_qualified\":{\"type\":\"boolean\"}}}}}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 960,
+          "y": 0,
+          "name": "Vapi — Launch Alex Voice Agent"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "json": "{{4.data}}"
+      },
+      "metadata": {
+        "designer": {
+          "x": 1280,
+          "y": 0,
+          "name": "Parse Vapi Call Response"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "module": "builtin:SetVariables",
+      "version": 1,
+      "parameters": {},
+      "mapper": {
+        "variables": [
+          {
+            "name": "transcript",
+            "value": "{{ifempty(5.artifact.transcript; \"No transcript available\")}}"
+          },
+          {
+            "name": "call_duration_seconds",
+            "value": "{{ifempty(5.durationSeconds; 0)}}"
+          },
+          {
+            "name": "vapi_call_status",
+            "value": "{{ifempty(5.status; 3.call_status)}}"
+          },
+          {
+            "name": "issue_type",
+            "value": "{{ifempty(5.analysis.structuredData.issue_type; \"unknown\")}}"
+          },
+          {
+            "name": "address",
+            "value": "{{ifempty(5.analysis.structuredData.address; \"\")}}"
+          },
+          {
+            "name": "preferred_time",
+            "value": "{{ifempty(5.analysis.structuredData.preferred_time; \"TBD\")}}"
+          },
+          {
+            "name": "urgency_level",
+            "value": "{{ifempty(5.analysis.structuredData.urgency_level; \"standard\")}}"
+          },
+          {
+            "name": "caller_name_final",
+            "value": "{{ifempty(5.analysis.structuredData.caller_name; 3.caller_name)}}"
+          },
+          {
+            "name": "call_qualified",
+            "value": "{{5.analysis.structuredData.call_qualified}}"
+          },
+          {
+            "name": "is_homeowner",
+            "value": "{{5.analysis.structuredData.is_homeowner}}"
+          }
+        ]
+      },
+      "metadata": {
+        "designer": {
+          "x": 1600,
+          "y": 0,
+          "name": "Set Vapi Extracted Variables"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "mapper": {},
+      "metadata": {
+        "designer": {
+          "x": 1920,
+          "y": 0,
+          "name": "Route by Call Status and Qualification"
+        }
+      },
+      "routes": [
+        {
+          "filter": {
+            "name": "Lane 1 — Answered + Qualified",
+            "conditions": [
+              [
+                {
+                  "a": "{{6.vapi_call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{6.call_qualified}}",
+                  "b": "true",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{6.address}}",
+                  "b": "",
+                  "o": "text:notequal"
+                },
+                {
+                  "a": "{{6.call_duration_seconds}}",
+                  "b": "30",
+                  "o": "number:greater"
+                }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 8,
+              "module": "builtin:SetVariables",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "variables": [
+                  {
+                    "name": "gpt_prompt",
+                    "value": "You are an assistant summarizing an inbound HVAC service call for a contractor's CRM. Generate a clean, professional lead summary from the following call transcript.\n\nCALL DETAILS:\n- Caller Name: {{6.caller_name_final}}\n- Caller Phone: {{3.caller_phone}}\n- Call SID: {{3.call_sid}}\n- Timestamp: {{3.call_timestamp}}\n- Call Duration: {{6.call_duration_seconds}} seconds\n- Issue Type: {{6.issue_type}}\n- Address: {{6.address}}\n- Preferred Time: {{6.preferred_time}}\n- Urgency Level: {{6.urgency_level}}\n- Homeowner Confirmed: {{6.is_homeowner}}\n\nFULL TRANSCRIPT:\n{{6.transcript}}\n\nWrite a 4-6 sentence lead summary covering: who called, what the HVAC problem is, the service address, how urgent it is, when they want service, and any special notes from the conversation. Format it for a business SMS — professional, concise, no markdown."
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2240,
+                  "y": 0,
+                  "name": "Format GPT Prompt"
+                }
+              }
+            },
+            {
+              "id": 9,
+              "module": "openai:gpt-3-createCompletion",
+              "version": 1,
+              "parameters": {
+                "model": "gpt-4o"
+              },
+              "mapper": {
+                "model": "gpt-4o",
+                "messages": [
+                  {
+                    "role": "user",
+                    "content": "{{8.gpt_prompt}}"
+                  }
+                ],
+                "max_tokens": 350,
+                "temperature": 0.3
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2560,
+                  "y": 0,
+                  "name": "GPT-4o — Summarize Lead"
+                }
+              }
+            },
+            {
+              "id": 10,
+              "module": "builtin:SetVariables",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "variables": [
+                  {
+                    "name": "lead_summary",
+                    "value": "{{9.choices[].message.content}}"
+                  },
+                  {
+                    "name": "event_title",
+                    "value": "HVAC Service — {{upper(replace(6.issue_type; \"_\"; \" \"))}} — {{6.caller_name_final}}"
+                  },
+                  {
+                    "name": "event_description",
+                    "value": "Lead Summary:\n{{9.choices[].message.content}}\n\nPhone: {{3.caller_phone}}\nAddress: {{6.address}}\nUrgency: {{6.urgency_level}}\nCall SID: {{3.call_sid}}"
+                  },
+                  {
+                    "name": "event_start",
+                    "value": "{{6.preferred_time}}"
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2880,
+                  "y": 0,
+                  "name": "Format Calendar Event Details"
+                }
+              }
+            },
+            {
+              "id": 11,
+              "module": "google-calendar:createEvent",
+              "version": 5,
+              "parameters": {
+                "calendarId": "primary"
+              },
+              "mapper": {
+                "summary": "{{10.event_title}}",
+                "description": "{{10.event_description}}",
+                "location": "{{6.address}}",
+                "start": {
+                  "dateTime": "{{10.event_start}}",
+                  "timeZone": "America/Chicago"
+                },
+                "end": {
+                  "dateTime": "{{addHours(10.event_start; 2)}}",
+                  "timeZone": "America/Chicago"
+                },
+                "colorId": "{{if(6.urgency_level = \"emergency\"; 11; if(6.urgency_level = \"urgent\"; 6; 2))}}",
+                "attendees": [],
+                "sendUpdates": "none",
+                "reminders": {
+                  "useDefault": false,
+                  "overrides": [
+                    {
+                      "method": "popup",
+                      "minutes": 60
+                    },
+                    {
+                      "method": "email",
+                      "minutes": 120
+                    }
+                  ]
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 3200,
+                  "y": 0,
+                  "name": "Google Calendar — Book Appointment"
+                }
+              }
+            },
+            {
+              "id": 12,
+              "module": "twilio:CreateMessage",
+              "version": 1,
+              "parameters": {
+                "accountSid": "{{connection.accountSid}}"
+              },
+              "mapper": {
+                "to": "{{connection.ownerPhone}}",
+                "from": "{{3.to_number}}",
+                "body": "NEW HVAC LEAD — {{3.call_timestamp}}\n\n{{10.lead_summary}}\n\nCalendar: {{11.htmlLink}}\n\nReply STOP to opt out."
+              },
+              "metadata": {
+                "designer": {
+                  "x": 3520,
+                  "y": 0,
+                  "name": "Twilio SMS — Notify Owner"
+                }
+              }
+            },
+            {
+              "id": 13,
+              "module": "twilio:CreateMessage",
+              "version": 1,
+              "parameters": {
+                "accountSid": "{{connection.accountSid}}"
+              },
+              "mapper": {
+                "to": "{{3.caller_phone}}",
+                "from": "{{3.to_number}}",
+                "body": "Hi {{6.caller_name_final}}! Your HVAC appointment is confirmed. We'll see you at {{6.preferred_time}}. Our team will reach out shortly to confirm the technician. Thank you for choosing us! — [Company Name]"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 3840,
+                  "y": 0,
+                  "name": "Twilio SMS — Confirm Caller"
+                }
+              }
+            },
+            {
+              "id": 14,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "parameters": {
+                "spreadsheetId": "{{connection.hvacSpreadsheetId}}",
+                "sheetId": "Leads"
+              },
+              "mapper": {
+                "values": {
+                  "Date": "{{3.call_timestamp}}",
+                  "Caller Name": "{{6.caller_name_final}}",
+                  "Phone": "{{3.caller_phone}}",
+                  "Issue Type": "{{6.issue_type}}",
+                  "Address": "{{6.address}}",
+                  "Urgency": "{{6.urgency_level}}",
+                  "Preferred Time": "{{6.preferred_time}}",
+                  "Call Duration (s)": "{{6.call_duration_seconds}}",
+                  "Call SID": "{{3.call_sid}}",
+                  "Is Homeowner": "{{6.is_homeowner}}",
+                  "GPT Summary": "{{10.lead_summary}}",
+                  "Calendar Link": "{{11.htmlLink}}",
+                  "Status": "Booked"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 4160,
+                  "y": 0,
+                  "name": "Google Sheets — Log Booked Lead"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "filter": {
+            "name": "Lane 2 — Missed Call",
+            "conditions": [
+              [
+                {
+                  "a": "{{3.call_status}}",
+                  "b": "no-answer",
+                  "o": "text:equal"
+                }
+              ],
+              [
+                {
+                  "a": "{{3.call_status}}",
+                  "b": "busy",
+                  "o": "text:equal"
+                }
+              ],
+              [
+                {
+                  "a": "{{6.vapi_call_status}}",
+                  "b": "missed",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 15,
+              "module": "builtin:SetVariables",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "variables": [
+                  {
+                    "name": "missed_caller_sms",
+                    "value": "Hey there! Sorry we missed your call. We're a local HVAC company serving the [Area] region — AC, heating, installs, and emergency service. Reply here or call us back and we'll get you taken care of fast! — [Company Name]"
+                  },
+                  {
+                    "name": "missed_owner_sms",
+                    "value": "MISSED CALL ALERT\nFrom: {{3.caller_phone}}\nTime: {{3.call_timestamp}}\nCall SID: {{3.call_sid}}\n\nNo transcript available. Recommend calling back within 5 minutes."
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2240,
+                  "y": 400,
+                  "name": "Set Missed Call Messages"
+                }
+              }
+            },
+            {
+              "id": 16,
+              "module": "twilio:CreateMessage",
+              "version": 1,
+              "parameters": {
+                "accountSid": "{{connection.accountSid}}"
+              },
+              "mapper": {
+                "to": "{{3.caller_phone}}",
+                "from": "{{3.to_number}}",
+                "body": "{{15.missed_caller_sms}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2560,
+                  "y": 400,
+                  "name": "Twilio SMS — Missed Call to Caller"
+                }
+              }
+            },
+            {
+              "id": 17,
+              "module": "twilio:CreateMessage",
+              "version": 1,
+              "parameters": {
+                "accountSid": "{{connection.accountSid}}"
+              },
+              "mapper": {
+                "to": "{{connection.ownerPhone}}",
+                "from": "{{3.to_number}}",
+                "body": "{{15.missed_owner_sms}}"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2880,
+                  "y": 400,
+                  "name": "Twilio SMS — Alert Owner of Missed Call"
+                }
+              }
+            },
+            {
+              "id": 18,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "parameters": {
+                "spreadsheetId": "{{connection.hvacSpreadsheetId}}",
+                "sheetId": "Leads"
+              },
+              "mapper": {
+                "values": {
+                  "Date": "{{3.call_timestamp}}",
+                  "Caller Name": "Unknown",
+                  "Phone": "{{3.caller_phone}}",
+                  "Issue Type": "N/A",
+                  "Address": "N/A",
+                  "Urgency": "N/A",
+                  "Preferred Time": "N/A",
+                  "Call Duration (s)": "0",
+                  "Call SID": "{{3.call_sid}}",
+                  "Is Homeowner": "Unknown",
+                  "GPT Summary": "Missed call — no transcript.",
+                  "Calendar Link": "N/A",
+                  "Status": "Missed"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 3200,
+                  "y": 400,
+                  "name": "Google Sheets — Log Missed Call"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "filter": {
+            "name": "Lane 3 — Answered but Unqualified",
+            "conditions": [
+              [
+                {
+                  "a": "{{6.vapi_call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                },
+                {
+                  "a": "{{6.call_qualified}}",
+                  "b": "true",
+                  "o": "text:notequal"
+                }
+              ],
+              [
+                {
+                  "a": "{{6.call_duration_seconds}}",
+                  "b": "30",
+                  "o": "number:lessequal"
+                },
+                {
+                  "a": "{{6.vapi_call_status}}",
+                  "b": "ended",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          },
+          "flow": [
+            {
+              "id": 19,
+              "module": "builtin:SetVariables",
+              "version": 1,
+              "parameters": {},
+              "mapper": {
+                "variables": [
+                  {
+                    "name": "unqualified_reason",
+                    "value": "{{if(6.call_duration_seconds <= 30; \"Short call (under 30s)\"; if(6.address = \"\"; \"No address captured\"; \"Did not qualify\"))}}"
+                  },
+                  {
+                    "name": "booking_link",
+                    "value": "{{connection.bookingPageUrl}}"
+                  }
+                ]
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2240,
+                  "y": 800,
+                  "name": "Set Unqualified Variables"
+                }
+              }
+            },
+            {
+              "id": 20,
+              "module": "twilio:CreateMessage",
+              "version": 1,
+              "parameters": {
+                "accountSid": "{{connection.accountSid}}"
+              },
+              "mapper": {
+                "to": "{{3.caller_phone}}",
+                "from": "{{3.to_number}}",
+                "body": "Hi! Thanks for reaching out to [Company Name]. We'd love to help with your HVAC needs. Book a quick call or appointment here: {{19.booking_link}} — Our team will get back to you right away!"
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2560,
+                  "y": 800,
+                  "name": "Twilio SMS — Send Booking Link"
+                }
+              }
+            },
+            {
+              "id": 21,
+              "module": "google-sheets:addRow",
+              "version": 2,
+              "parameters": {
+                "spreadsheetId": "{{connection.hvacSpreadsheetId}}",
+                "sheetId": "Leads"
+              },
+              "mapper": {
+                "values": {
+                  "Date": "{{3.call_timestamp}}",
+                  "Caller Name": "{{ifempty(6.caller_name_final; \"Unknown\")}}",
+                  "Phone": "{{3.caller_phone}}",
+                  "Issue Type": "{{ifempty(6.issue_type; \"Unknown\")}}",
+                  "Address": "{{ifempty(6.address; \"Not captured\")}}",
+                  "Urgency": "{{ifempty(6.urgency_level; \"Unknown\")}}",
+                  "Preferred Time": "N/A",
+                  "Call Duration (s)": "{{6.call_duration_seconds}}",
+                  "Call SID": "{{3.call_sid}}",
+                  "Is Homeowner": "{{ifempty(6.is_homeowner; \"Unknown\")}}",
+                  "GPT Summary": "Unqualified — {{19.unqualified_reason}}",
+                  "Calendar Link": "N/A",
+                  "Status": "Unqualified"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 2880,
+                  "y": 800,
+                  "name": "Google Sheets — Log Unqualified Call"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "slots": null,
+      "confidential": false,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": {
+      "orphans": []
+    }
+  },
+  "__SETUP_NOTES__": {
+    "connections_required": {
+      "twilio": "Twilio account with a purchased phone number. Set accountSid and authToken. Set ownerPhone to your mobile number.",
+      "vapi": "Vapi.ai account. Set vapiApiKey and vapiPhoneNumberId. Connect the Twilio number inside the Vapi dashboard.",
+      "openai": "OpenAI API key with gpt-4o access.",
+      "google_calendar": "Google Calendar OAuth connection. Events land on the 'primary' calendar — change calendarId to a dedicated HVAC calendar ID if preferred.",
+      "google_sheets": "Google Sheets OAuth connection. Create a spreadsheet with a sheet tab named 'Leads' and columns: Date, Caller Name, Phone, Issue Type, Address, Urgency, Preferred Time, Call Duration (s), Call SID, Is Homeowner, GPT Summary, Calendar Link, Status. Paste the spreadsheet ID into hvacSpreadsheetId."
+    },
+    "connection_variables": {
+      "connection.accountSid": "Twilio Account SID",
+      "connection.ownerPhone": "Owner mobile number in E.164 format, e.g. +15551234567",
+      "connection.vapiApiKey": "Vapi.ai API key",
+      "connection.vapiPhoneNumberId": "Vapi phone number resource ID",
+      "connection.hvacSpreadsheetId": "Google Sheets spreadsheet ID from the URL",
+      "connection.bookingPageUrl": "Calendly or booking page URL for unqualified leads"
+    },
+    "twilio_webhook": "In Twilio console, set the Voice webhook URL for your number to your Make.com webhook URL (from the twilio:NewCall module). Use HTTP POST.",
+    "vapi_architecture_note": "The HTTP module (id:4) calls Vapi to initiate or handle the call. In production, Vapi should be configured to receive the inbound Twilio call directly via a Twilio SIP trunk or Vapi phone number. The webhook from Vapi (post-call summary) should trigger a second Make scenario or be handled via the same webhook by checking the payload type. Adjust the Vapi response field paths (id:5 mapper) to match your exact Vapi account's response schema.",
+    "lane_routing_note": "Router Lane 3 (Unqualified) acts as the catch-all fallback — no explicit filter is required if you set it as the default route in Make's UI. The JSON filter conditions cover the two main unqualified cases.",
+    "node_count": 21
+  }
+}
