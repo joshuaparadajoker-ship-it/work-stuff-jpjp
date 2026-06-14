@@ -6,8 +6,8 @@
             "module": "twilio:WatchCalls",
             "version": 2,
             "parameters": {
-                "__IMTCONN__": 9368139,
-                "to": "+19493792748",
+                "__IMTCONN__": 0,
+                "to": "YOUR_TWILIO_HVAC_NUMBER",
                 "from": "",
                 "parentCallSid": "",
                 "status": "completed",
@@ -22,7 +22,7 @@
                 "restore": {
                     "parameters": {
                         "__IMTCONN__": {
-                            "label": "twilio hvac",
+                            "label": "Your Twilio Connection",
                             "data": {
                                 "scoped": "true",
                                 "connection": "twilio"
@@ -227,7 +227,7 @@
                 "gzip": true,
                 "useMtls": false,
                 "contentType": "application/json",
-                "data": "{\n  \"assistantId\": \"f50d49cd-453c-47ac-9d72-7db9412006fb\",\n  \"phoneNumberId\": \"YOUR_VAPI_PHONE_NUMBER_UUID_HERE\",\n  \"customer\": {\n    \"number\": \"{{1.From}}\"\n  }\n}",
+                "data": "{\n  \"assistantId\": \"YOUR_VAPI_ASSISTANT_ID\",\n  \"phoneNumberId\": \"YOUR_VAPI_PHONE_NUMBER_UUID_HERE\",\n  \"customer\": {\n    \"number\": \"{{1.From}}\"\n  }\n}",
                 "followAllRedirects": false
             },
             "metadata": {
@@ -636,7 +636,7 @@
                             "module": "openai-gpt-3:CreateCompletion",
                             "version": 1,
                             "parameters": {
-                                "__IMTCONN__": 9377202
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "select": "chat",
@@ -661,7 +661,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "hvac ai",
+                                            "label": "Your OpenAI Connection",
                                             "data": {
                                                 "scoped": "true",
                                                 "connection": "openai-gpt-3"
@@ -1261,11 +1261,11 @@
                             "module": "google-calendar:createAnEvent",
                             "version": 5,
                             "parameters": {
-                                "__IMTCONN__": 9060330
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "select": "detail",
-                                "calendar": "joshuaparadajoker@gmail.com",
+                                "calendar": "YOUR_GOOGLE_CALENDAR_EMAIL",
                                 "summary": "HVAC Service Call — {{1.From}}",
                                 "description": "Caller: {{1.From}}\nIssue: {{ifempty(24.issue_type; \"Unknown\")}}\nAddress: {{ifempty(24.address; \"Not captured\")}}\nUrgency: {{ifempty(24.urgency; \"Unknown\")}}\nSummary: {{ifempty(24.summary; \"Not available\")}}\nProcessed by: Alex Voice Agent",
                                 "startDate": "{{addDays(now; 1)}}",
@@ -1279,7 +1279,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "My Google connection (joshuaparadajoker@gmail.com)",
+                                            "label": "Your Google Connection",
                                             "data": {
                                                 "scoped": "true",
                                                 "connection": "google"
@@ -1292,7 +1292,7 @@
                                         },
                                         "calendar": {
                                             "mode": "chose",
-                                            "label": "joshuaparadajoker@gmail.com (Primary Calendar)"
+                                            "label": "Your Primary Calendar"
                                         }
                                     }
                                 },
@@ -1351,13 +1351,13 @@
                             "module": "twilio:SendSMS",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9368139
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "fromType": "phone",
                                 "to": "{{1.From}}",
                                 "messageBody": "body",
-                                "from": "+19493792748",
+                                "from": "YOUR_TWILIO_HVAC_NUMBER",
                                 "body": "Hi {{ifempty(24.caller_name; \"there\")}}, your HVAC service request has been received and logged. Our team will confirm your appointment time shortly. Questions? Call us at (949) 379-2748. — Alex, HVAC Dispatch"
                             },
                             "metadata": {
@@ -1368,7 +1368,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "twilio hvac",
+                                            "label": "Your Twilio Connection",
                                             "data": {
                                                 "scoped": "true",
                                                 "connection": "twilio"
@@ -1479,13 +1479,13 @@
                             "module": "twilio:SendSMS",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9368139
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "fromType": "phone",
-                                "to": "+17148775606",
+                                "to": "YOUR_OWNER_MOBILE_NUMBER",
                                 "messageBody": "body",
-                                "from": "+19493792748",
+                                "from": "YOUR_TWILIO_HVAC_NUMBER",
                                 "body": "New HVAC Lead\nCaller: {{1.From}}\nIssue: AC/Heating service request\nA call was just handled by Alex. Check Google Sheets for full summary and calendar for appointment details."
                             },
                             "metadata": {
@@ -1496,7 +1496,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "twilio hvac",
+                                            "label": "Your Twilio Connection",
                                             "data": {
                                                 "scoped": "true",
                                                 "connection": "twilio"
@@ -1607,7 +1607,7 @@
                             "module": "google-sheets:addRow",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9060330
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "mode": "select",
@@ -1615,7 +1615,7 @@
                                 "valueInputOption": "USER_ENTERED",
                                 "insertDataOption": "INSERT_ROWS",
                                 "from": "drive",
-                                "spreadsheetId": "/1Xw0sQzbdEEKXMitNE9tqfmjVwwNuWPE4flR6M75dieE",
+                                "spreadsheetId": "YOUR_GOOGLE_SHEETS_SPREADSHEET_ID",
                                 "sheetId": "Sheet1",
                                 "includesHeaders": true,
                                 "useColumnHeaders": true,
@@ -1637,7 +1637,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "My Google connection (joshuaparadajoker@gmail.com)",
+                                            "label": "Your Google Connection",
                                             "data": {
                                                 "scoped": "true",
                                                 "connection": "google"
@@ -1822,13 +1822,13 @@
                             "module": "twilio:SendSMS",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9368139
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "fromType": "phone",
                                 "to": "{{1.From}}",
                                 "messageBody": "body",
-                                "from": "+19493792748",
+                                "from": "YOUR_TWILIO_HVAC_NUMBER",
                                 "body": "Hey, sorry we missed your call! This is Alex with your local HVAC team. We'd love to help — call us back at (949) 379-2748 or reply here and we'll get you taken care of fast."
                             },
                             "metadata": {
@@ -1839,7 +1839,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "twilio hvac",
+                                            "label": "Your Twilio Connection",
                                             "data": {"scoped": "true", "connection": "twilio"}
                                         }
                                     },
@@ -1872,13 +1872,13 @@
                             "module": "twilio:SendSMS",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9368139
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "fromType": "phone",
-                                "to": "+17148775606",
+                                "to": "YOUR_OWNER_MOBILE_NUMBER",
                                 "messageBody": "body",
-                                "from": "+19493792748",
+                                "from": "YOUR_TWILIO_HVAC_NUMBER",
                                 "body": "Missed call from {{1.From}}. No one answered. Caller may need HVAC service — follow up ASAP."
                             },
                             "metadata": {
@@ -1889,7 +1889,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "twilio hvac",
+                                            "label": "Your Twilio Connection",
                                             "data": {"scoped": "true", "connection": "twilio"}
                                         }
                                     },
@@ -1922,7 +1922,7 @@
                             "module": "google-sheets:addRow",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9060330
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "mode": "select",
@@ -1930,7 +1930,7 @@
                                 "valueInputOption": "USER_ENTERED",
                                 "insertDataOption": "INSERT_ROWS",
                                 "from": "drive",
-                                "spreadsheetId": "/1Xw0sQzbdEEKXMitNE9tqfmjVwwNuWPE4flR6M75dieE",
+                                "spreadsheetId": "YOUR_GOOGLE_SHEETS_SPREADSHEET_ID",
                                 "sheetId": "Sheet1",
                                 "includesHeaders": true,
                                 "useColumnHeaders": true,
@@ -1952,7 +1952,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "My Google connection (joshuaparadajoker@gmail.com)",
+                                            "label": "Your Google Connection",
                                             "data": {"scoped": "true", "connection": "google"}
                                         }
                                     },
@@ -2083,13 +2083,13 @@
                             "module": "twilio:SendSMS",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9368139
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "fromType": "phone",
                                 "to": "{{1.From}}",
                                 "messageBody": "body",
-                                "from": "+19493792748",
+                                "from": "YOUR_TWILIO_HVAC_NUMBER",
                                 "body": "Hi! Sorry we missed you. We're a local HVAC company serving Orange County. Book a quick call here or reply with your address and issue and we'll get back to you fast. — Alex, HVAC Dispatch"
                             },
                             "metadata": {
@@ -2100,7 +2100,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "twilio hvac",
+                                            "label": "Your Twilio Connection",
                                             "data": {"scoped": "true", "connection": "twilio"}
                                         }
                                     },
@@ -2133,7 +2133,7 @@
                             "module": "google-sheets:addRow",
                             "version": 2,
                             "parameters": {
-                                "__IMTCONN__": 9060330
+                                "__IMTCONN__": 0
                             },
                             "mapper": {
                                 "mode": "select",
@@ -2141,7 +2141,7 @@
                                 "valueInputOption": "USER_ENTERED",
                                 "insertDataOption": "INSERT_ROWS",
                                 "from": "drive",
-                                "spreadsheetId": "/1Xw0sQzbdEEKXMitNE9tqfmjVwwNuWPE4flR6M75dieE",
+                                "spreadsheetId": "YOUR_GOOGLE_SHEETS_SPREADSHEET_ID",
                                 "sheetId": "Sheet1",
                                 "includesHeaders": true,
                                 "useColumnHeaders": true,
@@ -2163,7 +2163,7 @@
                                 "restore": {
                                     "parameters": {
                                         "__IMTCONN__": {
-                                            "label": "My Google connection (joshuaparadajoker@gmail.com)",
+                                            "label": "Your Google Connection",
                                             "data": {"scoped": "true", "connection": "google"}
                                         }
                                     },
